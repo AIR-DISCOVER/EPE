@@ -1,0 +1,5 @@
+# Usage: bash <task_name>.sh train/TEST
+export CUDA_VISIBLE_DEVICES=0
+python3 /home/gaoha/epe/code/epe/EPEExperiment.py\
+        --log_dir /DATA_EDS/gaoha/datasets/Carla/saved_tasks/Day09232acdc-fog/logs\
+         $1 /home/gaoha/epe/code/config/Day09232acdc-fog.yaml

@@ -1,0 +1,1 @@
+/home/gaoha/epe/CarlaSampleDataset/sp6-cloud0-pre0-fog0-sun30-n100-v100/1/rgb_v/359.png,/home/gaoha/epe/CarlaSampleDataset/sp6-cloud0-pre0-fog0-sun30-n100-v100/1/mask_v/359.png,/home/gaoha/epe/CarlaSampleDataset/g_buffer/sp6-cloud0-pre0-fog0-sun30-n100-v100/359.png.npz,/home/gaoha/epe/CarlaSampleDataset/sp6-cloud0-pre0-fog0-sun30-n100-v100/1/mask_v/359.png
