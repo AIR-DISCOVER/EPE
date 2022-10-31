@@ -1,0 +1,11 @@
+Carla/checkpoints
+.vscode/
+out/
+*.egg-info
+*.idea
+**/__pycache__/
+filelists/*.txt
+log/
+data/datasets
+*.pth.tar
+*.log
