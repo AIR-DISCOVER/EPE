@@ -431,6 +431,7 @@ if __name__ == '__main__':
 	parser = ArgumentParser()
 	EPEExperiment.add_arguments(parser)
 	args = parser.parse_args()
+	print(args)
 
 	ee.init_logging(args)
 

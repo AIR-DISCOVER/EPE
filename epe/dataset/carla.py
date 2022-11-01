@@ -116,8 +116,8 @@ class CarlaDataset(SyntheticDataset):
 		rel_path = '/'.join(img_path.__str__().split("/")[:-2])
 		gbuffer_path = os.path.join(rel_path, "gbuffer_v")
 		
-		g_buffer_list = ["SceneDepth", "SceneColor", "GBufferA", "GBufferB", "GBufferC", "GBufferD"]
-		gbuffer_filenames = [f"{gbuffer_name}/{filename}.png" for gbuffer_name in g_buffer_list]
+		g_buffer_list = ["SceneDepth", "SceneColor", "SceneGBufferA", "SceneGBufferB", "SceneGBufferC", "SceneGBufferD"]
+		gbuffer_filenames = [f"{filename}-{gbuffer_name}.png" for gbuffer_name in g_buffer_list]
 
 		data = {}
 		data['img'] = np.array(imageio.imread(img_path))
