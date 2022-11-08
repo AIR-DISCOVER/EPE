@@ -36,9 +36,9 @@ BatchNorm2d = functools.partial(nn.GroupNorm, 8)#functools.partial(InPlaceABNSyn
 # BN_MOMENTUM = 0.01
 logger = logging.getLogger(__name__)
 
-def conv3x3(in_planes, out_planes, stride=1):
+def conv3x3(in_planes, out_planes, stride=1, groups=3):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=groups,
 					 padding=0, bias=False))
 
 
@@ -46,6 +46,24 @@ def conv3x3s(in_planes, out_planes, stride=1):
 	"""3x3 convolution with padding"""
 	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
 					 padding=0, bias=True)))
+
+def channel_shuffle(x, groups=3):
+    batchsize, num_channels, height, width = x.data.size()
+
+    channels_per_group = num_channels // groups
+    
+    # reshape
+    x = x.view(batchsize, groups, 
+        channels_per_group, height, width)
+
+    # transpose
+    # - contiguous() required if transpose() is used before view().
+    #   See https://github.com/pytorch/pytorch/issues/764
+    x = torch.transpose(x, 1, 2).contiguous()
+
+    # flatten
+    x = x.view(batchsize, -1, height, width)
+    return x
 
 
 def make_blocks_dict(gbuffer_norm, num_gbuffer_layers):
@@ -55,11 +73,10 @@ def make_blocks_dict(gbuffer_norm, num_gbuffer_layers):
 	}
 
 
-
 class BasicBlock(nn.Module):
 	expansion = 1
 
-	def __init__(self, inplanes, planes, stride=1, downsample=None, norm_func=ge.gbuffer_norm_factory('Default', 0)):
+	def __init__(self, inplanes, planes, stride=1, downsample=None, norm_func=ge.gbuffer_norm_factory('Default', 0), channel_shuffling=channel_shuffle):
 		super(BasicBlock, self).__init__()
 		self.conv1 = conv3x3(inplanes, planes, stride)
 		self.bn1 = norm_func(planes)#, momentum=BN_MOMENTUM)
@@ -68,6 +85,7 @@ class BasicBlock(nn.Module):
 		self.bn2 = norm_func(planes)#, momentum=BN_MOMENTUM)
 		self.downsample = downsample
 		self.stride = stride
+		self.channel_shuffling = channel_shuffle
 
 	def forward(self, x):
 		x,g = x
@@ -76,6 +94,7 @@ class BasicBlock(nn.Module):
 
 		x = self.conv1(x)
 		x = self.bn1(x, g)
+		x = self.channel_shuffling(x)
 		x = self.conv2(x)
 		x = self.bn2(x, g)
 
