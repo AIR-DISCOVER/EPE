@@ -205,7 +205,7 @@ class CarlaDataset(SyntheticDataset):
 		return len(self._paths)
 
 if __name__ == "__main__":
-    data_path = "/DATA_EDS/gaoha/datasets/Carla/NightDepth/src_day2/file.txt"
+    data_path = "data/datasets/fake_datasets/NightDepth/src_day2/file.txt"
     dset = CarlaDataset((read_filelist(data_path, 4, True)))
     
     from p_tqdm import p_map

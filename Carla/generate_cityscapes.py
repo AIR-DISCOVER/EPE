@@ -9,7 +9,7 @@ if __name__ == '__main__':
     val_images_txt = "/home/share/datasets/cityscapes/val_images.txt"
     val_labels_txt = "/home/share/datasets/cityscapes/val_labels.txt"
 
-    output_txt = "/home/gaoha/epe/Carla/cityscapes.txt"
+    output_txt = "data/file_lists/real_dataset/CityScapes.txt"
 
     f = open(output_txt, 'w+', encoding='utf-8')
     g = open(train_images_txt, 'r', encoding='utf-8')

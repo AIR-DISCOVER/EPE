@@ -11,8 +11,9 @@
     Please replcae "+cu102" in "For V100" by "+cu111"
 
 # Dataset
-    real_dataset(CityScapes): data/real_dataset/CityScapes.txt
-    fake_dataset: data/fake_dataset/file.txt
+    File example：
+    real_dataset(CityScapes): data/file_lists/real_dataset/CityScapes.txt
+    fake_dataset: data/file_lists/fake_dataset/Carla/file.txt
 
 # Processing
     sh Carla/gen.sh

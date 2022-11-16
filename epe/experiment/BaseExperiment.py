@@ -347,7 +347,6 @@ class BaseExperiment:
 		
 		self.weight_dir      = Path(self.cfg.get('weight_dir', './savegames/'))		
 		self.weight_init     = self.cfg.get('name_load', None)
-		# self.dbg_dir         = Path(self.cfg.get('out_dir', '/home/gaoha/epe/code/out/'))
 		self.dbg_dir = self.weight_dir
 		self.result_ext      = '.jpg' 
 
