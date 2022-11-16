@@ -13,6 +13,7 @@ sys.path.append(CODE_DIR)
 
 import IPython
 import imageio
+from PIL import Image
 import numpy as np
 from skimage.transform import resize
 import scipy.io as sio
@@ -104,17 +105,10 @@ class CarlaDataset(SyntheticDataset):
 	def __getitem__(self, index):
 
 		index  = index % self.__len__()
-		img_path, robust_label_path, gbuffer_path, gt_label_path = self._paths[index]
+		img_path, robust_label_path, _, gt_label_path = self._paths[index]
 
-		# if not gbuffer_path.exists():
-		# 	self._log.error(f'Gbuffers at {gbuffer_path} do not exist.')
-		# 	raise FileNotFoundError
-		# 	pass
-
-		import os
 		filename = img_path.__str__().split("/")[-1][:-4]
-		rel_path = '/'.join(img_path.__str__().split("/")[:-2])
-		gbuffer_path = os.path.join(rel_path, "gbuffer_v")
+		gbuffer_path = os.path.join('/'.join(img_path.__str__().split("/")[:-2]), "gbuffer_v")
 		
 		g_buffer_list = ["SceneDepth", "SceneColor", "SceneGBufferA", "SceneGBufferB", "SceneGBufferC", "SceneGBufferD"]
 		gbuffer_filenames = [f"{filename}-{gbuffer_name}.png" for gbuffer_name in g_buffer_list]
@@ -124,7 +118,7 @@ class CarlaDataset(SyntheticDataset):
 
 		# Read from pngs
 		base_path = gbuffer_path
-		from PIL import Image
+
 		img_scene_depth = Image.open(os.path.join(base_path, gbuffer_filenames[0]))
 		data['depth'] = np.array(img_scene_depth)[:,:,0].astype(np.float32) / 255.0
 
@@ -153,15 +147,23 @@ class CarlaDataset(SyntheticDataset):
 				data['gbufferD']
 			], axis=2
 		)
-		gtlabel_map = np.array(imageio.imread(os.path.join(rel_path, "mask_v", f"{filename}.png")))
-		mask = np.zeros(shape=(gtlabel_map.shape[0], gtlabel_map.shape[1], 12))
-		
-		for idx, color in enumerate(Carla.color2id.keys()):
-			mask[:, :, Carla.color2id[tuple(color)] ] += (gtlabel_map == color).all(axis=2)
 
+		robust_label_color = np.array(imageio.imread(robust_label_path))
+		if robust_label_color.shape[2] == 3: # Robust label png contains RGB values
+			robust_label_map = np.ndarray(robust_label_color.shape[:2])
+			for idx, color in enumerate(Carla.color2id.keys()):
+				robust_label_map[(robust_label_color == color).all(axis=2)] = Carla.color2id[tuple(color)]
+		else: # Robust label png contains label ID
+			robust_label_map = robust_label_color
+
+		gt_label_map = np.array(imageio.imread(gt_label_path))
+		mask = np.zeros(shape=(gt_label_map.shape[0], gt_label_map.shape[1], 12))
+		for idx, color in enumerate(Carla.color2id.keys()):
+			mask[:, :, Carla.color2id[tuple(color)] ] += (gt_label_map == color).all(axis=2)
 		data['shader'] = mask
 
 		img       = mat2tensor(data['img'].astype(np.float32) / 255.0)
+		robust_labels = mat2tensor(robust_label_map).long()
 		gbuffers  = mat2tensor(data['gbuffers'].astype(np.float32))
 		gt_labels = mat2tensor(data['shader'].astype(np.float32))
 
@@ -182,21 +184,6 @@ class CarlaDataset(SyntheticDataset):
 
 		gt_labels = torch.concat([gt_labels[0:9, :, :], gt_labels[10:12, :, :]], dim=0)
 
-		# img =  mat2tensor(np.array(imageio.imread(img_path))).float() / 255.0
-		# gbuffers = np.load(gbuffer_path)['data'].transpose((2, 0, 1))[0:1, :, :]
-		# gtlabel_map = np.array(imageio.imread(gt_label_path))
-		# mask = np.zeros(shape=(gtlabel_map.shape[0], gtlabel_map.shape[1], 12))
-		# for idx, color in enumerate(Carla.color2id.keys()):
-		# 	mask[:, :, Carla.color2id[tuple(color)]] += (gtlabel_map == color).all(axis=2)
-		# gt_labels = mask.transpose((2, 0, 1))
-		# robust_labels = np.concatenate([mask[:, :, k][np.newaxis, :, :] * k for k in range(12)], axis=0)\
-		# 				.max(axis=0)[np.newaxis, :, :]
-		#
-		# # Convert to tensor
-		# gbuffers = torch.Tensor(gbuffers).float()
-		# gt_labels = torch.Tensor(gt_labels).float()
-		# robust_labels = torch.Tensor(robust_labels).long()
-
 
 		return EPEBatch(img, gbuffers=gbuffers, gt_labels=gt_labels, robust_labels=robust_labels, path=img_path, coords=None)
 
@@ -205,10 +192,11 @@ class CarlaDataset(SyntheticDataset):
 		return len(self._paths)
 
 if __name__ == "__main__":
-    data_path = "data/datasets/fake_datasets/NightDepth/src_day2/file.txt"
+    data_path = "data/file_lists/fake_dataset/Carla/file.txt"
     dset = CarlaDataset((read_filelist(data_path, 4, True)))
-    
+    from IPython import embed
     from p_tqdm import p_map
+    embed()
 
     def check(i):
         try:
