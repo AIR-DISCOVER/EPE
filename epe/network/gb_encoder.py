@@ -174,18 +174,18 @@ class BatchNormWrapper(nn.BatchNorm2d):
 
 
 def gbuffer_norm_factory(name, num_layers):
-	if name == 'Default':
-		return lambda dim_x: BatchNormWrapper(dim_x, affine=True)
-	elif name == 'SPADE':
-		return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['batch'], base_layer_factory['convr'],    num_layers=1)
-	elif name == 'RAD':
-		return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['group'], base_layer_factory['residual'], num_layers=num_layers)
-	elif name == 'RNAD':
-		return lambda dim_x: GBufferNorm(dim_x, dim_x, dim_x, base_norm_factory['group'], base_layer_factory['residual'], num_layers=num_layers)
-	elif name == 'RAC':
-		return lambda dim_x: GBufferConv(dim_x, 128, 128, base_layer_factory['residual2'], num_layers=num_layers)
-	else:
-		raise NotImplementedError
+    if name == 'Default':
+        return lambda dim_x: BatchNormWrapper(dim_x, affine=True)
+    elif name == 'SPADE':
+        return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['batch'], base_layer_factory['convr'],    num_layers=1)
+    elif name == 'RAD':
+        return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['group'], base_layer_factory['residual'], num_layers=num_layers)
+    elif name == 'RNAD':
+        return lambda dim_x: GBufferNorm(dim_x, dim_x, dim_x, base_norm_factory['group'], base_layer_factory['residual'], num_layers=num_layers)
+    elif name == 'RAC':
+        return lambda dim_x: GBufferConv(dim_x, 128, 128, base_layer_factory['residual2'], num_layers=num_layers)
+    else:
+        raise NotImplementedError
 
 
 class GBufferNorm(nn.Module):

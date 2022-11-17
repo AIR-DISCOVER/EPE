@@ -2,6 +2,7 @@ import math
 import warnings
 
 import IPython as IPython
+import time
 
 warnings.filterwarnings('ignore', message='numpy.dtype size changed')
 warnings.filterwarnings('ignore', message='numpy.ufunc size changed')
@@ -436,4 +437,8 @@ if __name__ == '__main__':
 	ee.init_logging(args)
 
 	experiment = EPEExperiment(args)
+ 
+	start = time.time()
 	experiment.run()
+	end = time.time()
+	print(f"internal: {end-start}")

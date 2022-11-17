@@ -43,9 +43,11 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
 	m += [nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)]
 
 	num_convs = len(dims)-2
+ 
 	for i,di in enumerate(dims[2:]):
-		c = nn.Conv2d(dims[i+1], di, 3, stride=strides[i+1], bias=spectral)
-
+		
+		c = nn.Conv2d(dims[i+1], di, 3, stride=strides[i+1], bias=spectral, groups=1)
+	
 		if kernel > 1:
 			m += [nn.ReplicationPad2d(kernel // 2)]
 		m += [c if not spectral else torch.nn.utils.spectral_norm(c)]

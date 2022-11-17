@@ -595,7 +595,7 @@ class BaseExperiment:
 				if self._should_save_epoch(e):
 					self._save_model(epochs=e)
 					pass
-				pass
+				pass 
 			pass
 		except:
 			if not self.no_safe_exit:
@@ -616,7 +616,7 @@ class BaseExperiment:
 		if self.weight_init is not None:
 			self._load_model()
 			pass
-
+		
 		self.network.eval()
 		with torch.no_grad():
 			for bi, batch_fake in enumerate(self.loader_fake):                
@@ -649,7 +649,7 @@ class BaseExperiment:
 		parser.add_argument('action', type=str, choices=cls.actions)
 		parser.add_argument('config', type=Path, help='Path to config file.')
 		parser.add_argument('-log', '--log', type=str, default='info', choices=_logstr2level.keys())
-		parser.add_argument('--log_dir', type=Path, default='/home/gaoha/epe/code/out/', help='Directory for log files.')
+		parser.add_argument('--log_dir', type=Path, default='/home/gaomx/epe/EPE/saved_tasks/carla-overfitting/logs/', help='Directory for log files.')
 		parser.add_argument('--gpu', type=int, default=0, help='ID of GPU. Use -1 to run on CPU. Default: 0')
 		parser.add_argument('--no_safe_exit', action='store_true', default=False, help='Do not save model if anything breaks.')
 		parser.add_argument('--uuid', type=str, default="", help="Save name.")

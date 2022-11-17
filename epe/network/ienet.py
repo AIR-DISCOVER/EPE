@@ -30,24 +30,26 @@ import torch.nn.functional as F
 import epe.network.gb_encoder as ge
 import epe.network.network_factory as nf
 
+import time
+
 # from .sync_bn.inplace_abn.bn import InPlaceABNSync
 
 BatchNorm2d = functools.partial(nn.GroupNorm, 8)#functools.partial(InPlaceABNSync, activation='none')
 # BN_MOMENTUM = 0.01
 logger = logging.getLogger(__name__)
 
-def conv3x3(in_planes, out_planes, stride=1, groups=3):
+def conv3x3(in_planes, out_planes, stride=1, groups=8):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=groups,
+	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=8,
 					 padding=0, bias=False))
 
 
 def conv3x3s(in_planes, out_planes, stride=1):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=8, 
 					 padding=0, bias=True)))
 
-def channel_shuffle(x, groups=3):
+def channel_shuffle(x, groups=8):
     batchsize, num_channels, height, width = x.data.size()
 
     channels_per_group = num_channels // groups
@@ -74,8 +76,8 @@ def make_blocks_dict(gbuffer_norm, num_gbuffer_layers):
 
 
 class BasicBlock(nn.Module):
-	expansion = 1
-
+	expansion = 1	
+ 
 	def __init__(self, inplanes, planes, stride=1, downsample=None, norm_func=ge.gbuffer_norm_factory('Default', 0), channel_shuffling=channel_shuffle):
 		super(BasicBlock, self).__init__()
 		self.conv1 = conv3x3(inplanes, planes, stride)
@@ -88,6 +90,7 @@ class BasicBlock(nn.Module):
 		self.channel_shuffling = channel_shuffle
 
 	def forward(self, x):
+		# print(f"#Parameters: {self._get_parameter_num()}.\n")
 		x,g = x
 
 		r = x if self.downsample is None else self.downsample(x)
@@ -102,6 +105,9 @@ class BasicBlock(nn.Module):
 		x = self.relu(x)
 
 		return [x, g]
+
+	def _get_parameter_num(self):
+		return sum(p.numel() for p in self.parameters())
 
 
 class Bottleneck(nn.Module):
@@ -426,6 +432,7 @@ class HighResolutionNet(nn.Module):
 								  3,
 								  1,
 								  1,
+								  groups=1,
 								  bias=False),
 						self.Norm2d(
 							num_channels_cur_layer[i]),#, momentum=BN_MOMENTUM),
@@ -440,7 +447,7 @@ class HighResolutionNet(nn.Module):
 						if j == i-num_branches_pre else inchannels
 					conv3x3s.append(nn.Sequential(
 						nn.Conv2d(
-							inchannels, outchannels, 3, 2, 1, bias=False),
+							inchannels, outchannels, 3, 2, 1, bias=False, groups=1),
 						self.Norm2d(outchannels),#, momentum=BN_MOMENTUM),
 						nn.ReLU(inplace=False)))
 				transition_layers.append(nn.Sequential(*conv3x3s))
@@ -453,7 +460,7 @@ class HighResolutionNet(nn.Module):
 		if stride != 1 or inplanes != planes * block_expansion:
 			downsample = nn.Sequential(
 				nn.Conv2d(inplanes, planes * block_expansion,
-						  kernel_size=1, stride=stride, bias=False),
+						  kernel_size=1, stride=stride, bias=False, groups=1),
 				self.Norm2d(planes * block_expansion),#, momentum=BN_MOMENTUM),
 			)
 
@@ -498,7 +505,8 @@ class HighResolutionNet(nn.Module):
 
 
 	def forward(self, epe_batch):
-
+		
+		# print(f"Total Parameters: {self._get_parameter_num()}")
 		x = epe_batch.img
 		g = epe_batch.gbuffers
 		s = epe_batch.gt_labels
@@ -601,6 +609,9 @@ class HighResolutionNet(nn.Module):
 			elif isinstance(m, nn.GroupNorm):
 				nn.init.constant_(m.weight, 1)
 				nn.init.constant_(m.bias, 0)
+    
+	def _get_parameter_num(self):
+		return sum(p.numel() for p in self.parameters())
 
 
 def make_hrnet_config(num_stages):

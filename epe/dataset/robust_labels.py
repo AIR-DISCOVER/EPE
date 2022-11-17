@@ -38,7 +38,7 @@ class RobustlyLabeledDataset(ImageDataset):
 		self.transform       = img_transform
 		self.label_transform = label_transform
 		self.name            = name
-
+		
 		self._log.info(f'Found {len(self.paths)} images.')
 		if len(self.paths) < 1:
 			self._log.warn('Dataset is empty!')
