@@ -1,6 +1,6 @@
 ---
 weight_dir: /home/gaomx/epe/EPE/Carla/checkpoints/carla2cs-3/ # path to folder where checkpoints should be stored
-# name_load: carla2cs3-210000  # name of the checkpoint to load
+# name_load: test-200  # name of the checkpoint to load
 
 common:
   unpin: false # disable pinning for the loader
@@ -11,9 +11,9 @@ common:
 
 train:
   max_epochs: -1
-  max_iterations: 100
+  max_iterations: 200
   save_epochs: -1 # save every X epochs
-  save_iterations: 20 # save every X iterations
+  save_iterations: 40 # save every X iterations
   name_save: test
   shuffle_train: true
   val_interval: 500 # run inference on validation set every X iterations
