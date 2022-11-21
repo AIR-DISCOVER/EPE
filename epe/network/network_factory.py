@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 
+
 logger = logging.getLogger('epe.nf')
 
 norm_factory = {\
@@ -46,7 +47,7 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
  
 	for i,di in enumerate(dims[2:]):
 		
-		c = nn.Conv2d(dims[i+1], di, 3, stride=strides[i+1], bias=spectral, groups=1)
+		c = nn.Conv2d(dims[i+1], di, 3, stride=strides[i+1], bias=spectral, groups=8)
 	
 		if kernel > 1:
 			m += [nn.ReplicationPad2d(kernel // 2)]
@@ -64,11 +65,37 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
 
 	return nn.Sequential(*m)
 
+def channel_shuffle(x, groups=8):
+    batchsize, num_channels, height, width = x.data.size()
+
+    channels_per_group = num_channels // groups
+    
+    # reshape
+    x = x.view(batchsize, groups, 
+        channels_per_group, height, width)
+
+    # transpose
+    # - contiguous() required if transpose() is used before view().
+    #   See https://github.com/pytorch/pytorch/issues/764
+    x = torch.transpose(x, 1, 2).contiguous()
+
+    # flatten
+    x = x.view(batchsize, -1, height, width)
+    return x
+
+def channel_split(features, ratio=0.5):
+	"""
+	ratio: c'/c, default value is 0.5
+	""" 
+	size = features.size()[1]
+	split_idx = int(size * ratio)
+	return features[:,:split_idx,:,:], features[:,split_idx:,:,:]
+
+
 
 class ResBlock(nn.Module):
 	def __init__(self, dims, first_stride=1, leaky_relu=True, spectral=False, norm_factory=None, kernel=3):
 		super(ResBlock, self).__init__()
-
 		self.conv = make_conv_layer(dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
 		self.down = make_conv_layer([dims[0], dims[-1]], first_stride, leaky_relu, spectral, None, True, kernel=kernel) \
 			if first_stride != 1 or dims[0] != dims[-1] else None
@@ -77,6 +104,77 @@ class ResBlock(nn.Module):
 
 	def forward(self, x):
 		return self.relu(self.conv(x) + (x if self.down is None else self.down(x)))
+
+
+class ResBlockOpt(nn.Module):
+	"""
+	This class aims to substitue the original ResBlock with the Shuffle Net V2 block. The parameter dims'
+	length must be 2 or 3.
+ 	"""
+	def __init__(self, dims, first_stride=1, leaky_relu=True, spectral=False, norm_factory=None, kernel=3, ratio=0.5):
+		super(ResBlockOpt, self).__init__()
+		self.ratio = ratio
+		self.dims = dims
+		if len(dims) == 2:
+			assert dims[0] == dims[1], f"Dims with len 2 must satisfy dims[0] == dims[1], but now with \
+   										dims[0] = {dims[0]}, dims[1] = {dims[1]}"
+			self.indicate = 0
+			self.conv_num = 1
+			self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
+			self.conv1 = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+		elif len(dims) == 3:
+			assert dims[0] == dims[1] or dims[1] == dims[2], f"Dims with len 3 must satisfy dims[0] == dims[1] \
+   				or dims[1] == dims[2], but now with dims[0] = {dims[0]}, dims[1] = {dims[1]}, dims[2] = {dims[2]}"
+       
+			if dims[0] == dims[1] and dims[1] == dims[2]:
+				self.conv_num = 1
+				self.new_dims = [int(dim*ratio) for dim in dims]
+				self.conv1 = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+			elif dims[0] == dims[1]:
+				self.conv_num = 2
+				self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
+				self.conv1 = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+				self.conv2 = make_conv_layer(dims[1:], first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+				self.indicate = 0
+			else:
+				self.conv_num = 2
+				self.new_dims = [int(dims[1]*ratio), int(dims[2]*ratio)]
+				self.conv1 = make_conv_layer(dims[:2], first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+				self.conv2 = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+				self.indicate = 1
+		else:
+			raise "Not Implemented Optimization"
+		
+		self.down_new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)] if self.indicate == 0 else \
+  								[int(dims[1]*ratio), int(dims[2]*ratio)]
+		self.down = make_conv_layer(self.down_new_dims, first_stride, leaky_relu, spectral, \
+                              None, True, kernel=kernel) if first_stride != 1 or dims[0] != dims[-1] else None
+	
+	def forward(self, x):
+		if self.conv_num == 1:
+			x1, x2 = channel_split(x, ratio=self.ratio)
+			x1 = self.conv1(x1)
+			if self.down is not None:
+				x2 = self.down(x2)
+			res = torch.cat((x1, x2), dim=1)
+		else:
+			if self.indicate == 0:
+				x1, x2 = channel_split(x, ratio=self.ratio)
+				x1 = self.conv1(x1)
+				if self.down is not None:
+					x2 = self.down(x2)
+				res = torch.cat((x1, x2), dim=1)
+				res = self.conv2(res)
+			elif self.indicate == 1:
+				x = self.conv1(x)
+				x1, x2 = channel_split(x, ratio=self.ratio)
+				if self.down is not None:
+					x2 = self.down(x2)
+				x1 = self.conv2(x1)
+				res = torch.cat((x1, x2), dim=1)
+		res = channel_shuffle(res, groups=2)
+		return res
+
 
 
 class Res2Block(nn.Module):

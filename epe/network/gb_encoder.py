@@ -16,7 +16,7 @@ _gbuffer_class_encoder_factory = {\
 	'group':   lambda di,do, s0, s1: nf.make_conv_layer([di,64,do], [s0,s1], True, False,  nf.norm_factory['group']),
 	'batch':   lambda di,do, s0, s1: nf.make_conv_layer([di,64,do], [s0,s1], True,  False, nf.norm_factory['batch']),
 	'domain':  lambda di,do, s0, s1: nf.make_conv_layer([di,64,do], [s0,s1], True,  False, nf.norm_factory['domain']),
-	'residual':lambda di,do, s0, s1: nn.Sequential(nf.ResBlock([di, 64, 64], s0, False, True), nf.ResBlock([64, 64, do], s1, False, True)),
+	'residual':lambda di,do, s0, s1: nn.Sequential(nf.ResBlockOpt([di, 64, 64], s0, False, True), nf.ResBlockOpt([64, 64, do], s1, False, True)),
 	'residual2':lambda di,do, s0, s1: nn.Sequential(nf.Res2Block([di, 64, 64], s0), nf.Res2Block([64, 64, do], s1)),
 }
 
@@ -127,7 +127,10 @@ class GBufferEncoder(nn.Module):
 		features are simply merged via the classmaps and encoded for different branches
 		of the image enhancment network.
 		"""
-
+		import time
+		start = time.time()
+		# for _ in range(50):
+		# print(f"#Parameters: {self._get_parameter_num()}")
 		if self._log.isEnabledFor(logging.DEBUG):
 			self._log.debug(f'G-BufferEncoder:forward(g:{gbuffers.shape}, c:{classmap.shape})')
 			pass
@@ -146,8 +149,13 @@ class GBufferEncoder(nn.Module):
 		for layer in self.joint_encoder_layers:
 			features.append(layer(features[-1]))
 			pass
-
+		end = time.time()
+		print(f"internal: {end-start}")
+		# exit(0)
 		return features[1:]
+
+	def _get_parameter_num(self):
+		return sum(p.numel() for p in self.parameters())
 
 
 base_norm_factory = {
