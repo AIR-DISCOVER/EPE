@@ -61,6 +61,6 @@ class Cityscapes(RobustlyLabeledDataset):
         label_path = self._img2label[img_path]
         robust_labels = imageio.imread(label_path)
 
-        robust_labels = torch.LongTensor(transform_labels(robust_labels))
+        robust_labels = torch.LongTensor(robust_labels[np.newaxis, :, :])
 
         return EPEBatch(img, path=img_path, robust_labels=robust_labels)

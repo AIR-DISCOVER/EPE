@@ -9,3 +9,4 @@ log/
 data/datasets
 *.pth.tar
 *.log
+*.png

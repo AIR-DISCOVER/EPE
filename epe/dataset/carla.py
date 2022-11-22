@@ -149,7 +149,7 @@ class CarlaDataset(SyntheticDataset):
 		)
 
 		robust_label_color = np.array(imageio.imread(robust_label_path))
-		if robust_label_color.shape[2] == 3: # Robust label png contains RGB values
+		if len(robust_label_color.shape) > 2 and robust_label_color.shape[2] == 3: # Robust label png contains RGB values
 			robust_label_map = np.ndarray(robust_label_color.shape[:2])
 			for idx, color in enumerate(Carla.color2id.keys()):
 				robust_label_map[(robust_label_color == color).all(axis=2)] = Carla.color2id[tuple(color)]
@@ -177,10 +177,10 @@ class CarlaDataset(SyntheticDataset):
 			raise FileNotFoundError
 			pass
 
-		label_map = [gt_labels[k][np.newaxis, :, :] * k for k in range(12)]
-		label_map = label_map[0:9] + label_map[10:12]  # Exclude 9
-		robust_labels = np.concatenate(label_map, axis=0).max(axis=0)[np.newaxis, :, :]
-		robust_labels =	torch.Tensor(robust_labels).long()
+		# label_map = [gt_labels[k][np.newaxis, :, :] * k for k in range(12)]
+		# label_map = label_map[0:9] + label_map[10:12]  # Exclude 9
+		# robust_labels = np.concatenate(label_map, axis=0).max(axis=0)[np.newaxis, :, :]
+		# robust_labels =	torch.Tensor(robust_labels).long()
 
 		gt_labels = torch.concat([gt_labels[0:9, :, :], gt_labels[10:12, :, :]], dim=0)
 
