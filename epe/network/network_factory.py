@@ -116,8 +116,8 @@ class ResBlockOpt(nn.Module):
 		self.ratio = ratio
 		self.dims = dims
 		if len(dims) == 2:
-			assert dims[0] == dims[1], f"Dims with len 2 must satisfy dims[0] == dims[1], but now with \
-   										dims[0] = {dims[0]}, dims[1] = {dims[1]}"
+			# assert dims[0] == dims[1], f"Dims with len 2 must satisfy dims[0] == dims[1], but now with \
+   			# 							dims[0] = {dims[0]}, dims[1] = {dims[1]}"
 			self.indicate = 0
 			self.conv_num = 1
 			self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
@@ -130,6 +130,7 @@ class ResBlockOpt(nn.Module):
 				self.conv_num = 1
 				self.new_dims = [int(dim*ratio) for dim in dims]
 				self.conv1 = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+				self.indicate = 0
 			elif dims[0] == dims[1]:
 				self.conv_num = 2
 				self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
@@ -144,9 +145,11 @@ class ResBlockOpt(nn.Module):
 				self.indicate = 1
 		else:
 			raise "Not Implemented Optimization"
-		
-		self.down_new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)] if self.indicate == 0 else \
+		if self.conv_num == 2:
+			self.down_new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)] if self.indicate == 0 else \
   								[int(dims[1]*ratio), int(dims[2]*ratio)]
+		else:
+			self.down_new_dims = [int(dims[0]*ratio), int(dims[-1]*ratio)]
 		self.down = make_conv_layer(self.down_new_dims, first_stride, leaky_relu, spectral, \
                               None, True, kernel=kernel) if first_stride != 1 or dims[0] != dims[-1] else None
 	
@@ -172,9 +175,41 @@ class ResBlockOpt(nn.Module):
 					x2 = self.down(x2)
 				x1 = self.conv2(x1)
 				res = torch.cat((x1, x2), dim=1)
-		res = channel_shuffle(res, groups=2)
+		res = channel_shuffle(res, groups=8)
 		return res
 
+
+class ResBlockOptDim2(nn.Module):
+	def __init__(self, dims, first_stride=1, leaky_relu=True, spectral=False, norm_factory=None, kernel=3, ratio=0.5):
+		assert len(dims) == 2, "This Optimizations' input dims length must be 2"
+		super(ResBlockOptDim2, self).__init__()
+		self.ratio = ratio
+		self.dims = dims
+		if dims[0] == dims[1]:
+			self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
+			self.down_new_dims = [int(dims[0]*ratio), int(dims[-1]*ratio)]
+			self.cat = True
+		else:
+			self.new_dims = dims
+			self.down_new_dims = [dims[0], dims[-1]]
+			self.cat = False
+   
+		self.conv = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
+		self.down = make_conv_layer(self.down_new_dims, first_stride, leaky_relu, spectral, \
+                              None, True, kernel=kernel) if first_stride != 1 or dims[0] != dims[-1] else None
+		self.relu = nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)
+  
+	def forward(self, x):
+		if self.cat:
+			x1, x2 = channel_split(x, ratio=self.ratio)
+			x1 = self.conv(x1)
+			if self.down is not None:
+				x2 = self.down(x2)
+			res = torch.cat((x1, x2), dim=1)
+			res = channel_shuffle(res, groups=8)
+		else:
+			res = self.relu(self.conv(x) + (x if self.down is None else self.down(x)))
+		return res
 
 
 class Res2Block(nn.Module):
@@ -205,7 +240,7 @@ class BottleneckBlock(nn.Module):
 		pass
 
 	def forward(self, x):
-		r = x if self_down is None else self._down(x)
+		r = x if self._down is None else self._down(x)
 		x = self._conv1(x)
 		x = self._norm1(x)
 		x = self._relu(x)

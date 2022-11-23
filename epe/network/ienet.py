@@ -38,15 +38,15 @@ BatchNorm2d = functools.partial(nn.GroupNorm, 8)#functools.partial(InPlaceABNSyn
 # BN_MOMENTUM = 0.01
 logger = logging.getLogger(__name__)
 
-def conv3x3(in_planes, out_planes, stride=1, groups=8):
+def conv3x3(in_planes, out_planes, stride=1, groups=1):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=8,
+	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=groups,
 					 padding=0, bias=False))
 
 
-def conv3x3s(in_planes, out_planes, stride=1):
+def conv3x3s(in_planes, out_planes, stride=1, groups=1):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=8, 
+	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=groups, 
 					 padding=0, bias=True)))
 
 def channel_shuffle(x, groups=8):
@@ -97,7 +97,7 @@ class BasicBlock(nn.Module):
 
 		x = self.conv1(x)
 		x = self.bn1(x, g)
-		x = self.channel_shuffling(x)
+		# x = self.channel_shuffling(x)
 		x = self.conv2(x)
 		x = self.bn2(x, g)
 
@@ -505,8 +505,8 @@ class HighResolutionNet(nn.Module):
 
 
 	def forward(self, epe_batch):
-		
-		# print(f"Total Parameters: {self._get_parameter_num()}")
+		# start = time.time()
+		print(f"Total Parameters: {self._get_parameter_num()}")
 		x = epe_batch.img
 		g = epe_batch.gbuffers
 		s = epe_batch.gt_labels
@@ -548,7 +548,6 @@ class HighResolutionNet(nn.Module):
 
 		x   = self.stem(x)
 		x,_ = self.layer1([x, g_list[0]])
-
 
 		x_list = [x if self.transitions[0][i] is None else self.transitions[0][i](x) \
 			for i in range(self.stage_cfgs[0]['NUM_BRANCHES'])]
@@ -597,7 +596,10 @@ class HighResolutionNet(nn.Module):
 		for i,xi in enumerate(x[1:]):
 			y = F.interpolate(y, size=(xi.shape[-2], xi.shape[-1]), mode='bilinear', align_corners=False)
 			y = self.up_layers[i](torch.cat((y, xi), 1))
-			pass			
+			pass		
+		
+		# end = time.time()
+		# print(f"Internal: {end-start}")
 		return y
 
 

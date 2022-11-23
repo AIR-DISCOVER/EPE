@@ -119,7 +119,7 @@ class GBufferEncoder(nn.Module):
 		classmap -- 4D tensor with one-hot-encoded masks for classes, also stacked along dim 1.
 
 		The cls2gbuf allows easily excluding G-buffers for some classes. This makes sense
-		if it is a priori known that G-buffers provide no useful info for this class and 
+		if it is a priori known that G-buffesefulrs provide no u info for this class and 
 		prevents learning spurious features from noise.
 
 		Depending on the classmap and cls2gbuf function, G-buffer info for each pixel 
@@ -127,14 +127,13 @@ class GBufferEncoder(nn.Module):
 		features are simply merged via the classmaps and encoded for different branches
 		of the image enhancment network.
 		"""
-		import time
-		start = time.time()
+		# import time
+		# start = time.time()
 		# for _ in range(50):
-		# print(f"#Parameters: {self._get_parameter_num()}")
+			# print(f"#Parameters: {self._get_parameter_num()}")
 		if self._log.isEnabledFor(logging.DEBUG):
 			self._log.debug(f'G-BufferEncoder:forward(g:{gbuffers.shape}, c:{classmap.shape})')
 			pass
-
 		num_classes = classmap.shape[1]
 		features = 0
 		for c in range(num_classes):
@@ -149,8 +148,8 @@ class GBufferEncoder(nn.Module):
 		for layer in self.joint_encoder_layers:
 			features.append(layer(features[-1]))
 			pass
-		end = time.time()
-		print(f"internal: {end-start}")
+		# end = time.time()
+		# print(f"internal: {end-start}")
 		# exit(0)
 		return features[1:]
 
@@ -169,7 +168,8 @@ base_layer_factory = {
 	# 'residual':lambda di,do:nf.ResBlock([di,do],1,False,False, nf.norm_factory['batch']),
 	'residual':lambda di,do:nf.ResBlock([di,do],1,False, True, None),
 	'residual2':lambda di,do:nf.Res2Block([di,do,do],1,),
-	'resnext':lambda di,do: nf.ResnextBlock(di, di//di2rnp[di][0], do, groups=di2rnp[di][1], stride=1)
+	'resnext':lambda di,do: nf.ResnextBlock(di, di//di2rnp[di][0], do, groups=di2rnp[di][1], stride=1),
+	'residualOptDim2':lambda di,do: nf.ResBlockOptDim2([di,do],1, False, True, None, ratio=0.5)
 }
 
 
@@ -187,7 +187,7 @@ def gbuffer_norm_factory(name, num_layers):
     elif name == 'SPADE':
         return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['batch'], base_layer_factory['convr'],    num_layers=1)
     elif name == 'RAD':
-        return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['group'], base_layer_factory['residual'], num_layers=num_layers)
+        return lambda dim_x: GBufferNorm(dim_x, 128, 128, base_norm_factory['group'], base_layer_factory['residualOptDim2'], num_layers=num_layers)
     elif name == 'RNAD':
         return lambda dim_x: GBufferNorm(dim_x, dim_x, dim_x, base_norm_factory['group'], base_layer_factory['residual'], num_layers=num_layers)
     elif name == 'RAC':
