@@ -16,7 +16,7 @@ train:
   save_iterations: 5000 # save every X iterations
   name_save: test
   shuffle_train: true
-  val_interval: 10000 # run inference on validation set every X iterations
+  val_interval: 5000 # run inference on validation set every X iterations
 
 test:
   shuffle_test: false
