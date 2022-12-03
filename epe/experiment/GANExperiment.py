@@ -294,6 +294,9 @@ class GANExperiment(BaseExperiment):
 
 		self.network.eval()
 
+		new_imgs = []
+
+
 		with torch.no_grad():
 			# t3 = time.time()
 			for bi, batch_fake in enumerate(self.loader_fake):
@@ -304,10 +307,34 @@ class GANExperiment(BaseExperiment):
 				result = self.evaluate_test(batch_fake, bi)
 				# t2 = time.time()
 				self.save_result(result, bi, iteration_idx=curr_iteration)
+    
+				new_img = result[0]
+				new_imgs.append(new_img)
+				
 				# print(f"Load: {(t0 - t3):.4f}s")
 				# t3 = time.time()
 				# print(f"Infer: {(t2 - t1):.4f}s")
 				# print(f"Save: {(t3 - t2):.4f}s")
-			pass
-		pass
 
+		# Calculate KID!
+		generated = (torch.cat(new_imgs, dim=0) * 255).cpu().to(torch.uint8)
+
+		SUBSET_SIZE = 50
+
+		real_list = []
+		with open(self.real_basepath, 'r') as f:
+			ls = f.read().strip().split('\n')
+			filenames = sorted([x.split(",")[0] for x in ls])[:SUBSET_SIZE]
+
+			import numpy as np
+			from PIL import Image
+			real_list = [np.asarray(Image.open(filename)).transpose((2, 0, 1)) for filename in filenames]
+   
+		real = torch.tensor(np.stack(real_list, axis=0))
+
+		from torchmetrics.image.kid import KernelInceptionDistance
+		kid = KernelInceptionDistance(subset_size=SUBSET_SIZE)
+		kid.update(real, real=True)
+		kid.update(generated, real=False)
+		kid_mean, kid_std = kid.compute()
+		self._log.info(f'[TEST] kid_mean ± kid_std: {kid_mean:.6f}±{kid_std:.6f}')
