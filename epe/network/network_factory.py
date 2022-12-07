@@ -4,7 +4,7 @@ from math import sqrt
 import torch
 import torch.nn as nn
 
-
+import epe.network.utils
 
 logger = logging.getLogger('epe.nf')
 
@@ -17,7 +17,8 @@ norm_factory = {\
 }
 
 
-def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_factory=None, skip_final_relu=False, kernel=3):
+def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_factory=None, skip_final_relu=False, kernel=3,
+                    channel_pruning=False):
 	""" Make simple convolutional networks without downsampling.
 
 	dims -- list with channel widths, where len(dims)-1 is the number of concolutional layers to create.
@@ -47,7 +48,7 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
  
 	for i,di in enumerate(dims[2:]):
 		
-		c = nn.Conv2d(dims[i+1], di, 3, stride=strides[i+1], bias=spectral, groups=8)
+		c = nn.Conv2d(dims[i+1], di, 3, stride=strides[i+1], bias=spectral, groups=1)
 	
 		if kernel > 1:
 			m += [nn.ReplicationPad2d(kernel // 2)]
@@ -103,7 +104,11 @@ class ResBlock(nn.Module):
 		pass
 
 	def forward(self, x):
+		# print(f"original: {self._get_parameter_num()}")
 		return self.relu(self.conv(x) + (x if self.down is None else self.down(x)))
+
+	def _get_parameter_num(self):
+		return sum(p.numel() for p in self.parameters())
 
 
 class ResBlockOpt(nn.Module):
@@ -200,6 +205,7 @@ class ResBlockOptDim2(nn.Module):
 		self.relu = nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)
   
 	def forward(self, x):
+		# print(f"After: {self._get_parameter_num()}")
 		if self.cat:
 			x1, x2 = channel_split(x, ratio=self.ratio)
 			x1 = self.conv(x1)
@@ -210,6 +216,10 @@ class ResBlockOptDim2(nn.Module):
 		else:
 			res = self.relu(self.conv(x) + (x if self.down is None else self.down(x)))
 		return res
+
+	def _get_parameter_num(self):
+		return sum(p.numel() for p in self.parameters())
+
 
 
 class Res2Block(nn.Module):

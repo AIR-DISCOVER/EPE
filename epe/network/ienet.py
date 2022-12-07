@@ -40,13 +40,13 @@ logger = logging.getLogger(__name__)
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=groups,
+	return nn.Sequential(nn.ReplicationPad2d(1), nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
 					 padding=0, bias=False))
 
 
 def conv3x3s(in_planes, out_planes, stride=1, groups=1):
 	"""3x3 convolution with padding"""
-	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, groups=groups, 
+	return nn.Sequential(nn.ReplicationPad2d(1), torch.nn.utils.spectral_norm(nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, 
 					 padding=0, bias=True)))
 
 def channel_shuffle(x, groups=8):
@@ -506,7 +506,7 @@ class HighResolutionNet(nn.Module):
 
 	def forward(self, epe_batch):
 		# start = time.time()
-		print(f"Total Parameters: {self._get_parameter_num()}")
+		# print(f"Total Parameters: {self._get_parameter_num()}")
 		x = epe_batch.img
 		g = epe_batch.gbuffers
 		s = epe_batch.gt_labels
