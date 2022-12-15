@@ -212,7 +212,7 @@ def weight_reconstruction(next_module, next_input_feature, next_output_feature, 
         next_output_feature = next_output_feature.transpose(1, 2).reshape(num_fields, -1)
     if cpu:
         next_output_feature = next_output_feature.cpu()
-    param, _ = torch.gels(next_output_feature.data, next_input_feature.data)
+    param, _ = torch.lstsq(next_output_feature.data, next_input_feature.data)
     param = param[0:next_input_feature.size(1), :].clone().t().contiguous().view(next_output_feature.size(1), -1)
     if isinstance(next_module, torch.nn.modules.conv._ConvNd):
         param = param.view(next_module.out_channels, next_module.in_channels, *next_module.kernel_size)
@@ -234,7 +234,7 @@ def prune_channel(sparsity, module, next_module, fn_next_input_feature, input_fe
         'random': randomly select
     :param cpu: bool, whether done in cpu for larger reconstruction batch size
     :return:
-        void
+        channels pruned
     """
     assert input_feature.dim() >= 2  # N x C x ...
     output_feature = module(input_feature)
@@ -247,7 +247,7 @@ def prune_channel(sparsity, module, next_module, fn_next_input_feature, input_fe
     indices_pruned = channel_selection(sparsity=sparsity, output_feature=output_feature,
                                        fn_next_output_feature=fn_next_output_feature, method=method)
     module_surgery(module=module, next_module=next_module, indices_pruned=indices_pruned)
-
     next_input_feature = fn_next_input_feature(module(input_feature))
     weight_reconstruction(next_module=next_module, next_input_feature=next_input_feature,
                           next_output_feature=next_output_feature, cpu=cpu)
+    return indices_pruned

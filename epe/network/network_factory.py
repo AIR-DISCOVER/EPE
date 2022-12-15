@@ -5,8 +5,13 @@ import torch
 import torch.nn as nn
 
 import epe.network.utils
+from epe.network.utils import prune_channel
+
+import warnings
+warnings.simplefilter("ignore", UserWarning)
 
 logger = logging.getLogger('epe.nf')
+
 
 norm_factory = {\
 	'none': None,
@@ -29,7 +34,7 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
 	skip_final_relu -- don't use a relu at the end
 	kernel -- width of kernel
 	"""
-
+	spectral=False
 	if type(strides) == int:
 		strides = [strides] + [1] * (len(dims)-2)
 		pass
@@ -64,7 +69,7 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
 			m += [nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)]
 		pass
 
-	return nn.Sequential(*m)
+	return nn.Sequential(*m).to(device='cuda')
 
 def channel_shuffle(x, groups=8):
     batchsize, num_channels, height, width = x.data.size()
@@ -84,7 +89,7 @@ def channel_shuffle(x, groups=8):
     x = x.view(batchsize, -1, height, width)
     return x
 
-def channel_split(features, ratio=0.5):
+def channel_split(features, ratio=0.5, retain=False):
 	"""
 	ratio: c'/c, default value is 0.5
 	""" 
@@ -185,40 +190,64 @@ class ResBlockOpt(nn.Module):
 
 
 class ResBlockOptDim2(nn.Module):
-	def __init__(self, dims, first_stride=1, leaky_relu=True, spectral=False, norm_factory=None, kernel=3, ratio=0.5):
-		assert len(dims) == 2, "This Optimizations' input dims length must be 2"
-		super(ResBlockOptDim2, self).__init__()
-		self.ratio = ratio
-		self.dims = dims
-		if dims[0] == dims[1]:
-			self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
-			self.down_new_dims = [int(dims[0]*ratio), int(dims[-1]*ratio)]
-			self.cat = True
-		else:
-			self.new_dims = dims
-			self.down_new_dims = [dims[0], dims[-1]]
-			self.cat = False
-   
-		self.conv = make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel)
-		self.down = make_conv_layer(self.down_new_dims, first_stride, leaky_relu, spectral, \
+    count = 0
+    def __init__(self, dims, first_stride=1, num_layers=3, leaky_relu=True, spectral=False, norm_factory=None, kernel=3, ratio=0.5):
+        assert len(dims) == 2, "This Optimizations' input dims length must be 2"
+        super(ResBlockOptDim2, self).__init__()
+        self.ratio = ratio
+        self.dims = dims
+        self.num_layers = num_layers
+        if dims[0] == dims[1]:
+            self.new_dims = [int(dims[0]*ratio), int(dims[1]*ratio)]
+            self.down_new_dims = [int(dims[0]*ratio), int(dims[-1]*ratio)]
+            self.cat = True
+        else:
+            self.new_dims = dims
+            self.down_new_dims = [dims[0], dims[-1]]
+            self.cat = False
+            
+        self.conv = []
+        self.conv.append(make_conv_layer(self.new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel))
+        self.down = make_conv_layer(self.down_new_dims, first_stride, leaky_relu, spectral, \
                               None, True, kernel=kernel) if first_stride != 1 or dims[0] != dims[-1] else None
-		self.relu = nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)
-  
-	def forward(self, x):
-		# print(f"After: {self._get_parameter_num()}")
-		if self.cat:
-			x1, x2 = channel_split(x, ratio=self.ratio)
-			x1 = self.conv(x1)
-			if self.down is not None:
-				x2 = self.down(x2)
-			res = torch.cat((x1, x2), dim=1)
-			res = channel_shuffle(res, groups=8)
-		else:
-			res = self.relu(self.conv(x) + (x if self.down is None else self.down(x)))
-		return res
-
-	def _get_parameter_num(self):
-		return sum(p.numel() for p in self.parameters())
+        self.relu = nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)
+        
+        # Channel Pruning
+        self.next_new_dims = [int(dims[1]*ratio), int(dims[1]*ratio)]
+        for i in range(1, num_layers):
+            self.conv.append(make_conv_layer(self.next_new_dims, first_stride, leaky_relu, spectral, norm_factory, True, kernel=kernel))
+            
+        def fn_next(x):
+            x = self.conv[0][2](x)
+            x = self.conv[0][0](x)
+            return x
+        self.fn_next = fn_next
+    
+    def forward(self, x):
+        if self.cat:
+            x1, x2 = channel_split(x, ratio=self.ratio)
+            # self.conv = torch.load(f"/home/gaomx/epe/EPE/Carla/channel_pruning/RAD_pruning{ResBlockOptDim2.count%80}.pth", \
+            #                        map_location=torch.device('cuda'))
+            for i in range(self.num_layers-1):
+                # x1_c = self.conv[0][0](x1.clone())
+                # prune_channel(sparsity=0.5, module=self.conv[i][1], next_module=self.conv[i+1][1],
+				# 	fn_next_input_feature=self.fn_next, input_feature=x1_c, method='greedy', cpu=False)
+                x1 = self.conv[i](x1)
+            
+            x1 = self.conv[-1](x1)
+            # print(f"Save RAD BLOCK")
+            # torch.save(self.conv, f"/home/gaomx/epe/EPE/Carla/channel_pruning/RAD_pruning{ResBlockOptDim2.count}.pth")
+            # ResBlockOptDim2.count += 1
+            if self.down is not None:
+                x2 = self.down(x2)
+            res = torch.cat((x1, x2), dim=1)
+            res = channel_shuffle(res, groups=8)
+        else:
+            res = self.relu(self.conv(x) + (x if self.down is None else self.down(x)))
+        return res
+    
+    def _get_parameter_num(self):
+        return sum(p.numel() for p in self.parameters())
 
 
 

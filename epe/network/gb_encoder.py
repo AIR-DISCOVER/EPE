@@ -169,7 +169,7 @@ base_layer_factory = {
 	'residual':lambda di,do:nf.ResBlock([di,do],1,False, True, None),
 	'residual2':lambda di,do:nf.Res2Block([di,do,do],1,),
 	'resnext':lambda di,do: nf.ResnextBlock(di, di//di2rnp[di][0], do, groups=di2rnp[di][1], stride=1),
-	'residualOptDim2':lambda di,do: nf.ResBlockOptDim2([di,do],1, False, True, None, ratio=0.5)
+	'residualOptDim2':lambda di,do, num_layers=3: nf.ResBlockOptDim2([di,do],1,num_layers, False, True, None, ratio=0.5)
 }
 
 
@@ -218,6 +218,9 @@ class GBufferNorm(nn.Module):
 		model = []
 		dim_in = dim_g
 		for i in range(num_layers):
+			if isinstance(gbuf_proc(dim_in, dim_e), nf.ResBlockOptDim2):
+				model += [gbuf_proc(dim_in, dim_e, num_layers)]
+				break
 			model += [gbuf_proc(dim_in,dim_e)]
 			dim_in = dim_e
 			pass
