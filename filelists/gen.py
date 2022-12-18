@@ -7,7 +7,7 @@ def generate_cityscapes(root, save_path):
     for image in glob.glob(os.path.join(root, 'leftImg8bit', '**/*.png'), recursive=True):
         if 'test' in image or 'val' in image:
             continue
-        image_rel_path = os.path.relpath(image, os.path.abspath('leftImg8bit'))
+        image_rel_path = os.path.relpath(image, os.path.abspath(os.path.join(root, 'leftImg8bit')))
         label_rel_path = image_rel_path[:-15] + 'trainLabelIds.png'
         image_path = os.path.abspath(os.path.join(root, 'leftImg8bit', image_rel_path))
         label_path = os.path.abspath(os.path.join(root, 'gtFine', label_rel_path))
