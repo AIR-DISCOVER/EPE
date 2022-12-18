@@ -50,7 +50,7 @@ def init_logging(args):
 	now = datetime.datetime.now()
 	log_path = args.log_dir / f'{args.config.stem}_{datetime.date.today().isoformat()}_{now.hour}-{now.minute}-{now.second}.log'
 	level = parse_loglevel(args.log)
-	logging.basicConfig(level=level, format="%(asctime)s %(message)s", handlers=[logging.FileHandler(log_path, mode='a'), logging.StreamHandler()])	
+	logging.basicConfig(level=level, format="[%(name)s] %(asctime)s %(message)s", handlers=[logging.FileHandler(log_path, mode='a'), logging.StreamHandler()])	
 
 
 class NetworkState:

@@ -1,3 +1,4 @@
+import os
 import argparse
 from pathlib import Path
 
@@ -27,6 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--num_crops', type=int, help="Number of crops to sample per image. Default = 15.", default=15)
     parser.add_argument('--out_dir', type=Path, help="Where to store the crop info.", default='.')
     args = parser.parse_args()
+    os.makedirs(args.out_dir, exist_ok=True)
 
     network   = VGG16(False, padding='none').to(device)
     extract   = lambda img: network.fw_relu(img, 13)[-1]
