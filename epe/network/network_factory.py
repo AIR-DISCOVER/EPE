@@ -34,7 +34,7 @@ def make_conv_layer(dims, strides=1, leaky_relu=True, spectral=False, norm_facto
 	skip_final_relu -- don't use a relu at the end
 	kernel -- width of kernel
 	"""
-	spectral=False
+	# spectral=False
 	if type(strides) == int:
 		strides = [strides] + [1] * (len(dims)-2)
 		pass
